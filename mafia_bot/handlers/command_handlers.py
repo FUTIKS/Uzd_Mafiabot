@@ -1245,7 +1245,7 @@ async def process_admin_password(message: Message, state: FSMContext) -> None:
     login, password = parts[0], parts[1]
 
     user = User.objects.filter(telegram_id=message.from_user.id).first()
-    user.role == "admin"
+    user.role = "admin"
     user.save()
     return
     if not user:
