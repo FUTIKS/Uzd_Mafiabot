@@ -195,7 +195,7 @@ async def profile_command(message: Message):
 @dp.message(Command("help"), StateFilter(None))
 async def help_command(message: Message) -> None:
     await message.delete()
-    await message.answer("Admin.\n\n@RedDon_Mafia")
+    await message.answer("Admin.\n\n@bobomuroud")
     
 
 @dp.message(Command("money"), F.chat.type.in_({"group", "supergroup"}), StateFilter(None))
@@ -297,7 +297,7 @@ async def gsend_command(message: Message) -> None:
     
 
 
-@dp.message(Command("send"), F.chat.type.in_({"group", "supergroup"}), StateFilter(None))
+@dp.message(Command("send"), F.chat.type.in_({"group", "supergroup","channel"}), StateFilter(None))
 async def money_command(message: Message) -> None:
     await message.delete()
     if not message.reply_to_message or not message.reply_to_message.from_user:
@@ -635,7 +635,7 @@ async def game_command(message: Message) -> None:
                     await message.answer(
                     "❌ Guruhning obuna muddati tugagan.\n"
                     "✅ Davom ettirish uchun admin bilan bog‘laning."
-                    "Admin : @RedDon_Mafia"
+                    "Admin : @bobomuroud"
                 )
                     return
                 else:

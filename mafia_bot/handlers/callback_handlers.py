@@ -324,14 +324,14 @@ async def p2p_callback(callback: CallbackQuery):
     if not cost:
         cost = PriceStones.objects.create()
     if which == "money":
-        text = f"💶 Pulni naqd pul orqali olish\n\nNarxlar:\n\n{cost.money_in_money}\n\nTo'lovni amalga oshirish uchun @RedDon_Mafia ga yozing."
+        text = f"💶 Pulni naqd pul orqali olish\n\nNarxlar:\n\n{cost.money_in_money}\n\nTo'lovni amalga oshirish uchun @bobomuroud ga yozing."
         await callback.message.edit_text(
         text=text,
         reply_markup=back_btn("money")
     )
     else:
         await callback.message.edit_text(
-        text=f"💎 Olmosni naqd pul orqali olish\n\nNarxlar:\n\n{cost.stone_in_money}\n\nTo'lovni amalga oshirish uchun @RedDon_Mafia ga yozing.",
+        text=f"💎 Olmosni naqd pul orqali olish\n\nNarxlar:\n\n{cost.stone_in_money}\n\nTo'lovni amalga oshirish uchun @bobomuroud ga yozing.",
         reply_markup=back_btn("stone")
     )
         

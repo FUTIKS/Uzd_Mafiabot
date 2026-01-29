@@ -1830,9 +1830,21 @@ def check_game_over(game_id: int) -> str | None:
     return None
 
 
-async def stop_game_if_needed(game_id :int):
+
+async def is_user_in_chat( user_id: int) -> bool:
+    chat_id = "@UzbekskayaMafiaOfficial"
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return member.status not in (
+            ChatMemberStatus.LEFT,
+            ChatMemberStatus.KICKED,
+        )
+    except Exception:
+        return False
+
+async def stop_game_if_needed(game_id: int):
     game_id = int(game_id)
-    game_state = games_state.get(int(game_id))
+    game_state = games_state.get(game_id)
     if not game_state:
         return False
 
@@ -1842,18 +1854,13 @@ async def stop_game_if_needed(game_id :int):
 
     game_state["meta"]["phase"] = "ended"
     game_state["meta"]["winner"] = winner_key
-
     chat_id = game_state.get("meta", {}).get("chat_id")
 
     final_text, winners, loosers = await build_final_game_text(game_id, winner_key)
 
     try:
-        await send_safe_message(
-            chat_id=chat_id,
-            text=final_text,
-            parse_mode="HTML"
-        )
-    except Exception:
+        await send_safe_message(chat_id=chat_id, text=final_text, parse_mode="HTML")
+    except:
         pass
 
     game = Game.objects.filter(id=game_id).first()
@@ -1868,20 +1875,33 @@ async def stop_game_if_needed(game_id :int):
 
     users_qs = User.objects.filter(telegram_id__in=all_players)
     users_map = {u.telegram_id: u for u in users_qs}
+    users = [users_map[int(tg)] for tg in all_players if int(tg) in users_map]
+
+    # 🔥 Telegram group membershipni parallel tekshirish
+    followers = await asyncio.gather(
+        *(is_user_in_chat( u.telegram_id) for u in users)
+    )
+    followers_map = {u.telegram_id: f for u, f in zip(users, followers)}
 
     dm_payload = []
 
-    
-
     with transaction.atomic():
         records = []
+        users_to_update = []
 
-        for tg_id in all_players:
-            u = users_map.get(int(tg_id))
-            if not u:
-                continue
-
+        for u in users:
             is_winner = u.telegram_id in winners
+            is_group_follower = followers_map.get(u.telegram_id, False)
+
+            reward = (
+                110 if is_winner and is_group_follower else
+                55 if is_winner else
+                50 if is_group_follower else
+                25
+            )
+
+            u.coin += reward
+            users_to_update.append(u)
 
             records.append(
                 MostActiveUser(
@@ -1892,46 +1912,40 @@ async def stop_game_if_needed(game_id :int):
                 )
             )
 
-            if is_winner:
-                u.coin += 55
-                reward = 55
-            else:
-                u.coin += 25
-                reward = 25
-
-            u.save(update_fields=["coin"])
-
             role_key = roles_map.get(u.telegram_id)
             role_text = ROLE_LABELS.get(role_key, "Unknown")
-
             user_link = f"<a href='tg://user?id={u.telegram_id}'>{u.first_name}</a>"
 
             if is_winner:
                 text = (
-                    "O'yin tugadi!\n"
-                    f"{role_text} rolida yutganingiz uchun sizga 💵 {reward} berildi!\n\n"
-                    f"👤 {user_link}\n\n"
+                    "🏆 O'yin tugadi!\n"
+                    f"{role_text} rolida g‘alaba qozondingiz!\n"
+                    f"💵 Mukofot: {reward}\n\n"
+                    f"{user_link}\n\n"
                     f"💵 Pullar: {u.coin}\n"
-                    f"💎 Toshlar: {u.stones}\n\n"
+                    f"💎 Toshlar: {u.stones}\n"
                     f"🛡 Ximoya: {u.protection}\n"
                     f"📂 Hujjatlar: {u.docs}\n\n"
+                    "@UzbekskayaMafiaOfficial obunachilari 2x bonus oladi!"
                 )
             else:
                 text = (
-                    "O'yin tugadi!\n"
-                    f"Siz {reward} 💶 qo'lga kiritdingiz.\n\n"
-                    f"👤 {user_link}\n\n"
+                    "🎮 O'yin tugadi!\n"
+                    f"Ishtirok uchun mukofot: {reward} 💵\n\n"
+                    f"{user_link}\n\n"
                     f"💵 Pullar: {u.coin}\n"
-                    f"💎 Toshlar: {u.stones}\n\n"
+                    f"💎 Toshlar: {u.stones}\n"
                     f"🛡 Ximoya: {u.protection}\n"
                     f"📂 Hujjatlar: {u.docs}\n\n"
+                    "@UzbekskayaMafiaOfficial obunachilari 2x bonus oladi!"
                 )
 
             dm_payload.append((u.telegram_id, text))
 
-        if records:
-            MostActiveUser.objects.bulk_create(records)
+        User.objects.bulk_update(users_to_update, ["coin"])
+        MostActiveUser.objects.bulk_create(records)
 
+    # DM yuborish
     for user_id, text in dm_payload:
         try:
             await send_safe_message(
@@ -1940,9 +1954,10 @@ async def stop_game_if_needed(game_id :int):
                 parse_mode="HTML",
                 reply_markup=cart_inline_btn()
             )
-        except Exception:
+        except:
             pass
 
+    # Cleanup
     games_state.pop(game_id, None)
     writing_allowed_groups.pop(chat_id, None)
     game_tasks.pop(game_id, None)
@@ -1953,7 +1968,6 @@ async def stop_game_if_needed(game_id :int):
         await auto_begin_game(chat_id)
 
     return True
-
 
 def format_duration(seconds: int) -> str:
     m = seconds // 60
