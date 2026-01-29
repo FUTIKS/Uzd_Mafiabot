@@ -3167,49 +3167,52 @@ async def process_begin_instant_count(message: Message, state: FSMContext) -> No
 @dp.callback_query(F.data == "trial")
 async def trial_callback(callback: CallbackQuery):
     await callback.answer()
+
     page = 1
     limit = 5
     offset = (page - 1) * limit
-    groupes = GroupTrials.objects.all()[offset:offset + limit]
+
+    groups = GroupTrials.objects.all()[offset:offset + limit]
     total = GroupTrials.objects.count()
     total_pages = (total + limit - 1) // limit
-    
-    
-    group_list = "\n".join([
-    f"{i+1}. <a href='{group.group_username}'>{group.group_name}</a>"
-    if group.group_username
-    else f"{i+1}. {group.group_name}"
-    for i, group in enumerate(groupes)
-])
 
-    \
+    group_list = "\n".join([
+        f"{offset + i + 1}. <a href='https://t.me/{g.group_username}'>{g.group_name}</a>"
+        if g.group_username else f"{offset + i + 1}. {g.group_name}"
+        for i, g in enumerate(groups)
+    ])
+
     await callback.message.edit_text(
         text=f"Obunadagi guruhlar (sahifa {page}/{total_pages}):\n\n{group_list}",
-        reply_markup=trial_groupes_keyboard(questions=groupes, page=page, total=total, per_page=limit))
-    
+        reply_markup=trial_groupes_keyboard(groups, page, total, limit),
+        parse_mode="HTML"
+    )
+
+
 @dp.callback_query(F.data.startswith("olga_page:"))
 async def quizzes_page_callback(callback_query: CallbackQuery):
     await callback_query.answer()
+
     page = int(callback_query.data.split(":")[1])
     limit = 5
     offset = (page - 1) * limit
 
-    total = PremiumGroup.objects.count()
+    groups = GroupTrials.objects.all()[offset:offset + limit]
+    total = GroupTrials.objects.count()
     total_pages = (total + limit - 1) // limit
 
-    groups = GroupTrials.objects.all()[offset:offset + limit]
-
     group_list = "\n".join([
-    f"{i+1}. <a href='{group.group_username}'>{group.group_name}</a>"
-    if group.group_username
-    else f"{i+1}. {group.group_name}"
-    for i, group in enumerate(groups)
-])
+        f"{offset + i + 1}. <a href='https://t.me/{g.group_username}'>{g.group_name}</a>"
+        if g.group_username else f"{offset + i + 1}. {g.group_name}"
+        for i, g in enumerate(groups)
+    ])
 
-    
     await callback_query.message.edit_text(
         text=f"Obunadagi guruhlar (sahifa {page}/{total_pages}):\n\n{group_list}",
-        reply_markup=trial_groupes_keyboard(questions=groups, page=page, total=total, per_page=limit))
+        reply_markup=trial_groupes_keyboard(groups, page, total, limit),
+        parse_mode="HTML"
+    )
+
     
 @dp.callback_query(F.data.startswith("olga_select:"))
 async def quiz_select(callback):
@@ -3217,13 +3220,20 @@ async def quiz_select(callback):
     group_id = callback.data.split(":")[1]
     group = GroupTrials.objects.get(id=group_id)
 
-    link_text = f"{group.group_username}" if group.group_username else "Link mavjud emas"
+    if group.group_username:
+        if "http" in group.group_username:
+            link_display = group.group_username
+        else:
+            link_display = f"@{group.group_username}"
+    else:
+        link_display = "Link mavjud emas"
+
 
     await callback.message.edit_text(
     text=(
         f"🌟 Obunadagi guruhni boshqarish\n\n"
         f"Nomi: {group.group_name}\n"
-        f"Link: {link_text}\n"
+        f"Link: {link_display}\n"
         f"Obuna tugash sanasi: {group.end_date.strftime('%Y-%m-%d')}\n"
     ),
     reply_markup=trial_group_manage_btn(group.id)
