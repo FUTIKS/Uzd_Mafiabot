@@ -1,0 +1,15 @@
+services:
+  bot:
+    build: .
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py bot
+      "
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
