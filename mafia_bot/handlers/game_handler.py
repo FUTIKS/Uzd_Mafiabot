@@ -289,10 +289,11 @@ async def start_game(game_id):
             for tg_id in alive_after_night:
                 game_data = games_state.get(game_id, {})
                 night_action = game_data.get("night_actions", {})
+                effects = game_data.get("effects", {})
                 lover_block_target = night_action.get("lover_block_target")
                 day_action = game_data.get("day_actions", {})
                 fraud_target = day_action.get('fraud_target')
-                if lover_block_target == tg_id or fraud_target == tg_id:
+                if lover_block_target == tg_id or fraud_target == tg_id or tg_id in effects.get("blocked", {}):
                     continue
                 try:
                     await send_safe_message(

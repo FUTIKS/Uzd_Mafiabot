@@ -27,7 +27,7 @@ MAFIA_ROLES = {
 SOLO_ROLES = {
     "killer", "ninja", "snowball", "clone", "drunk",
     "mermaid", "traveler", "fraud", "kam", "suid",
-    "rage", "vampire_old"
+    "rage", "vampireold"
 }
 
 PEACE_ROLES = {
@@ -46,7 +46,7 @@ NIGHT_ACTION_ROLES = {
     # Solo
     "killer", "ninja", "snowball", "clone",
     "drunk", "mermaid", "traveler", "fraud",
-    "rage", "vampire_old",
+    "rage", "vampireold",
 }
 
 LINK_RE = re.compile(
@@ -99,7 +99,7 @@ ROLE_TEAM = {
     "kam": "solo",
     "suid": "solo",
     "rage": "solo",
-    "vampire_old": "solo",
+    "vampireold": "solo",
 }
 
 
@@ -187,12 +187,12 @@ ROLE_NIGHT_ROUTER = {
     ),
 
     "vampireold": lambda tg_id, g, players, day: (
-        ACTIONS.get("vampireold_kill"),
+        ACTIONS.get("vampire_old_kill"),
         action_inline_btn("vampireold", tg_id, players, g.id, g.chat_id, day)
     ),
 
     "drunk": lambda tg_id, g, players, day: (
-        ACTIONS.get("drunk_kill"),
+        ACTIONS.get("drunk_action"),
         action_inline_btn("drunk", tg_id, players, g.id, g.chat_id, day)
     ),
 
@@ -207,10 +207,12 @@ ROLE_NIGHT_ROUTER = {
 async def send_night_action(tg_id, role, game_id, game, users_after_night, day):
     game_data = games_state.get(game_id, {})
     night_action = game_data.get("night_actions", {})
-
+    effects = game_data.get("effects", {})
     if night_action.get("lover_block_target") == tg_id:
         return
-
+    if tg_id in effects.get("blocked", {}):
+        return
+    role = game_data.get("temp_roles", {}).get(tg_id) or role
     if role in ("peace","serg","kam","suid","nurse","nogiron","ghost"):
         return
 
@@ -320,6 +322,7 @@ def init_game(game_id: int, chat_id: int | None = None):
                 "special": set(),
             },
             "rage_marks":[],
+            "temp_roles": {},
 
             "night_actions": {
                 "don_kill_target": None,
@@ -777,6 +780,8 @@ def day_reset(game_id: int):
         game["meta"]["day"] += 1
 
         game["kills"]["hanged"].clear()
+        game["temp_roles"].clear()
+
 
         da = game["day_actions"]
         da["votes"].clear()
@@ -1197,13 +1202,42 @@ async def notify_new_doc( new_doc_id: int):
     except Exception:
         pass
 
+def clone_check_transform(game: dict):
+    roles = game.get("roles", {})
+    alive = set(game.get("alive", []))
+    dead = set(game.get("dead", []))
+    na = game.get("night_actions", {})
+
+    clone_id = next((uid for uid, r in roles.items() if r == "clone"), None)
+    if not clone_id or clone_id not in alive:
+        return None
+
+    target_id = na.get("clone_target")
+    if not target_id:
+        return None
+
+    target_id = int(target_id)
+
+    # Agar target shu tun o‘lgan bo‘lsa
+    if target_id in dead:
+        new_role = roles.get(target_id)
+        if not new_role:
+            return None
+
+        roles[clone_id] = new_role
+        game["roles"] = roles
+
+        return clone_id, new_role
+
+    return None
+
+
 
 def traveler_copy_role(game: dict):
     roles = game.get("roles", {})
     alive = set(game.get("alive", []))
     night_actions = game.get("night_actions", {})
-    blocked = game.setdefault("blocked_tonight", set())
-    temp_roles = game.setdefault("temp_roles", {})
+    effects = game.get("effects", {})
 
     traveler_id = next((uid for uid, r in roles.items() if r == "traveler" and uid in alive), None)
     if not traveler_id:
@@ -1222,14 +1256,11 @@ def traveler_copy_role(game: dict):
     if not target_role:
         return None
 
-    # Traveler target rolini oladi (faqat shu kecha)
-    temp_roles[traveler_id] = target_role
+    # Traveler vaqtincha rol oladi
+    game.setdefault("temp_roles", {})[traveler_id] = target_role
 
-    # Target bloklanadi
-    blocked.add(target_id)
-
-    game["temp_roles"] = temp_roles
-    game["blocked_tonight"] = blocked
+    # Target bloklanadi (system bo‘yicha)
+    effects["blocked"][target_id] = "traveler"
 
     return traveler_id, target_id, target_role
 
@@ -1272,6 +1303,10 @@ async def hero_day_actions(game_id: int):
                 text="🥷 Siz geroy orqali faqat o'zingizni himoyalay olasiz."
             )
 
+async def deny_kill(game, attacker_role, text):
+    attacker_id = get_alive_role_id(game, attacker_role)
+    if attacker_id:
+        await send_safe_message(chat_id=int(attacker_id), text=text)
 
 
 
@@ -1297,6 +1332,8 @@ async def apply_night_actions(game_id: int):
         user = alive_users_map.get(int(tg_id))
         return user.get("first_name") if user else str(tg_id)
 
+    clone_check_transform(game)
+    traveler_copy_role(game)
     protected = effects.setdefault("protected", {})
 
     doc_id = get_alive_role_id(game, "doc")
@@ -1345,7 +1382,7 @@ async def apply_night_actions(game_id: int):
 
     ninja_id = get_alive_role_id(game, "ninja")
     if ninja_id:
-        add_intent(night_actions.get("ninja_target"), "ninja", priority=99)
+        add_intent(night_actions.get("ninja_target"), "ninja", priority=1)
     
     drunk_id = get_alive_role_id(game, "drunk")
     if drunk_id:
@@ -1423,34 +1460,32 @@ async def apply_night_actions(game_id: int):
                     parse_mode="HTML"
                 )
                 continue
+            
         if role == "ghost" and not killer_by == "ninja":
             killer_id = get_alive_role_id(game, killer_by)
-            await send_safe_message(
-                chat_id=int(killer_id),
-                text=f"Siz Ruxni o'ldira olmaysiz!",
-                parse_mode="HTML"
+            await deny_kill(game, killer_by,
+                f"Siz Ghostni o'ldira olmaysiz!"
             )
             continue
+        
         if role == "vampireold" and not killer_by == "vampirehunter":
             killer_id = get_alive_role_id(game, killer_by)
-        await send_safe_message(
-            chat_id=int(killer_id),
-            text=f"Siz Vampirni o'ldira olmaysiz!",
-            parse_mode="HTML"
-        )
-        if role == "mermaid" and  killer_by == "com":
-            com_id = get_alive_role_id(game, "com")
-            await send_safe_message(
-                chat_id=int(com_id),
-                text="Siz Suv parisini o'ldira olmaysiz!"
+            await deny_kill(game, killer_by,
+                f"Siz Vampirni o'ldira olmaysiz!"
             )
             continue
+        
+        if role == "mermaid" and  killer_by == "com":
+            com_id = get_alive_role_id(game, "com")
+            await deny_kill(game, "com",
+                f"Siz Suv parisini o'ldira olmaysiz!"
+            )
+            continue
+        
         if killer_by == "elf" and role in PEACE_ROLES:
             elf_id = get_alive_role_id(game, "elf")
-            await send_safe_message(
-                chat_id=int(elf_id),
-                text=f"🧝‍♀️ Siz <a href='tg://user?id={target_id}'>{uname(target_id)}</a> ni o'ldira olmaysiz, chunki u tinch aholi!"
-                
+            await deny_kill(game, "elf",
+                f"Siz tinch aholini o'ldira olmaysiz!"
             )
             continue
         
@@ -1463,20 +1498,21 @@ async def apply_night_actions(game_id: int):
             target_user["protection"] -= 1
             target_user_qs.protection -= 1
             target_user_qs.save(update_fields=["protection"])
-
+            await send_safe_message(
+                chat_id=int(chat_id),
+                text=f"🛡️ Kimningdir himoyasi ishladi va tirik qoldi!"
+            )
             saved_tonight.append((target_id, "himoya", killer_by))
             continue
         
 
 
-        if roles.get(int(target_id)) == "kam":
+        if role == "kam":
             killer_id = get_alive_role_id(game, killer_by)
             kill(game, killer_id)
             dead_tonight.append((killer_id, "kam"))
 
-        if roles.get(int(target_id)) == "ghost":
-            if not killer_by == "ninja":
-                continue
+       
             
         kill(game, target_id)
         dead_tonight.append((target_id, killer_by))

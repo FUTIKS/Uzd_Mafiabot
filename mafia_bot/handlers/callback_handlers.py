@@ -834,12 +834,12 @@ async def process_rich_reward(callback, target_id):
             username=callback.from_user.username
         )
 
-    user.coin += 20
+    user.coin += 100
     user.save()
 
     await send_safe_message(
         chat_id=target_id,
-        text="💸 Sizga boy tomonidan 20 ta pullar berildi!"
+        text="💸 Sizga boy tomonidan 100 pul berildi!"
     )
 
 
@@ -887,7 +887,6 @@ async def rich_callback(callback: CallbackQuery):
 
     target_id = int(target_raw)
 
-    # 🔒 GAME LOGIC (DB qismi alohida taskga)
     await process_rich_reward(callback, target_id)
 
     add_visit(game=game, visitor_id=rich_id, house_id=target_id, invisible=False)
@@ -1820,7 +1819,7 @@ async def vampire_callback(callback: CallbackQuery):
 
     if day != str(game['meta']['day']):
         await callback.message.edit_text(
-            f"{ACTIONS.get('vampire_kill')}\n\nSiz kechikdingiz.",
+            f"{ACTIONS.get('vampire_old_kill')}\n\nSiz kechikdingiz.",
             parse_mode="HTML"
         )
         return
@@ -1833,7 +1832,7 @@ async def vampire_callback(callback: CallbackQuery):
     if target_raw == "no":
         await callback.message.edit_reply_markup(None)
         await callback.message.edit_text(
-            f"{ACTIONS.get('vampire_kill')}\n\nSiz hech kimni o'ldirmadingiz.",
+            f"{ACTIONS.get('vampire_old_kill')}\n\nSiz hech kimni o'ldirmadingiz.",
             parse_mode="HTML"
         )
         return
@@ -1863,7 +1862,7 @@ async def vampire_callback(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
-        f"{ACTIONS.get('vampire_kill')}\n\nSiz <a href='tg://user?id={target_id}'>{target_name}</a> ni nishonga oldingiz. ({len(kills)}/2)",
+        f"{ACTIONS.get('vampire_old_kill')}\n\nSiz <a href='tg://user?id={target_id}'>{target_name}</a> ni nishonga oldingiz. ({len(kills)}/2)",
         parse_mode="HTML"
     )
 
@@ -1884,7 +1883,7 @@ async def drunk_callback(callback: CallbackQuery):
 
     if day != str(game['meta']['day']):
         await callback.message.edit_text(
-            f"{ACTIONS.get('drunk_kill')}\n\nSiz kechikdingiz.",
+            f"{ACTIONS.get('drunk_action')}\n\nSiz kechikdingiz.",
             parse_mode="HTML"
         )
         return
@@ -1897,7 +1896,7 @@ async def drunk_callback(callback: CallbackQuery):
 
     if target_raw == "no":
         await callback.message.edit_text(
-            f"{ACTIONS.get('drunk_kill')}\n\nSiz hech kimnikiga bormadingiz.",
+            f"{ACTIONS.get('drunk_action')}\n\nSiz hech kimnikiga bormadingiz.",
             parse_mode="HTML"
         )
         await send_safe_message(
@@ -1920,7 +1919,7 @@ async def drunk_callback(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
-        f"{ACTIONS.get('drunk_kill')}\n\nSiz <a href='tg://user?id={target_id}'>{target_name}</a> uyiga bostirib kirdingiz.",
+        f"{ACTIONS.get('drunk_action')}\n\nSiz <a href='tg://user?id={target_id}'>{target_name}</a> uyiga bostirib kirdingiz.",
         parse_mode="HTML"
     )
 
@@ -1962,9 +1961,13 @@ async def clone_callback(callback: CallbackQuery):
 
     target_id = int(target_raw)
 
-    # 🔒 GAME LOGIC — O‘ZGARMAGAN
+
     game['night_actions']['clone_target'] = target_id
-    add_visit(game=game, visitor_id=clone_id, house_id=target_id, invisible=False)  
+
+    add_visit(game=game, visitor_id=clone_id, house_id=target_id, invisible=False)
+
+    await callback.message.edit_reply_markup(None)
+
     target_name = get_first_name_from_players(target_id)
 
     await send_safe_message(
