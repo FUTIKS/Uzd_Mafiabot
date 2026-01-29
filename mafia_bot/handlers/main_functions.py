@@ -339,6 +339,7 @@ def init_game(game_id: int, chat_id: int | None = None):
                 "vampire_old_target": None,
                 "vampire_hunter_target": None,
                 "fraud_target": None,
+                "killer_target":[],
                 "traveler_target": None,
                 
                 "elf_target": None,
@@ -349,7 +350,6 @@ def init_game(game_id: int, chat_id: int | None = None):
                 "lover_block_target": None,
 
                 "cooker_target": None,
-                "killer_target": None,
                 "advokat_target": None,
                 "spy_target": None,
                 
@@ -753,7 +753,7 @@ def night_reset(game_id: int):
 
         na["lover_block_target"] = None
         na["cooker_target"] = None
-        na["killer_target"] = None
+        na["killer_target"] = []
         na["advokat_target"] = None
         na["spy_target"] = None
         na["ninja_target"] = None
@@ -1370,7 +1370,8 @@ async def apply_night_actions(game_id: int):
 
     killer_id = get_alive_role_id(game, "killer")
     if killer_id:
-        add_intent(night_actions.get("killer_target"), "killer", priority=1)
+        for t in night_actions.get("killer_target", []):
+            add_intent(t, "killer", priority=1)
 
     com_id = get_alive_role_id(game, "com")
     if com_id:

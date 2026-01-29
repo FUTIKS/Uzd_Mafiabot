@@ -172,7 +172,7 @@ def shop_inline_btn():
     keyboard2 = InlineKeyboardButton(text="📂 Hujjatlar - 500 💵", callback_data="buy_docs_0")
     keyboard3 = InlineKeyboardButton(text="🎗️ Osilishdan ximoya  - 20000 💵", callback_data="buy_hangprotect_1")
     keyboard4 = InlineKeyboardButton(text="🎗️ Osilishdan ximoya  - 20 💎", callback_data="buy_hangprotect_2")
-    keyboard5 = InlineKeyboardButton(text="🎭 Rol sotib olish", callback_data="buy_active_role")
+    keyboard5 = InlineKeyboardButton(text="🎭 Rol sotib olish", callback_data="buy_activerole")
     keyboard6 = InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_profile")
     design = [
         [keyboard1],

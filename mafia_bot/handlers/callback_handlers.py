@@ -246,7 +246,7 @@ async def buy_callback(callback: CallbackQuery):
                 parse_mode="HTML",
                 reply_markup=cart_inline_btn()
             )
-    elif thing_to_buy == "active_role":
+    elif thing_to_buy == "activerole":
         await callback.message.edit_text(
             text="🎭 Rol sotib olish uchun quyidagi ro'llardan birini tanlang:",
             reply_markup=role_shop_inline_keyboard()
